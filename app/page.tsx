@@ -78,6 +78,14 @@ type GeocodeResponse = {
   error?: string;
 };
 
+type ReverseGeocodeResponse = {
+  address?: {
+    label: string;
+    fullLabel: string;
+  };
+  error?: string;
+};
+
 type NearbyResponse = {
   locksmiths?: NearbyLocksmith[];
   error?: string;
@@ -92,6 +100,9 @@ export default function Home() {
   >("idle");
   const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
   const [locationLabel, setLocationLabel] = useState("");
+  const [locationSource, setLocationSource] = useState<
+    "gps" | "manual" | null
+  >(null);
   const [message, setMessage] = useState("");
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -111,6 +122,7 @@ export default function Home() {
 
   async function useCurrentLocation() {
     setMessage("");
+    setLocationSource(null);
     resetResults();
 
     if (!window.isSecureContext) {
@@ -151,20 +163,43 @@ export default function Home() {
     setLocationStatus("loading");
 
     navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        setCoordinates({
+      async ({ coords }) => {
+        const gpsCoordinates = {
           latitude: coords.latitude,
           longitude: coords.longitude,
-        });
+        };
+
+        setCoordinates(gpsCoordinates);
         setManualLocation("");
-        setLocationLabel("Tu ubicación actual");
-        setLocationStatus("ready");
+        setLocationLabel("");
+        setLocationSource("gps");
         setShowManualLocation(false);
         setMessage("");
+
+        try {
+          const params = new URLSearchParams({
+            lat: String(gpsCoordinates.latitude),
+            lng: String(gpsCoordinates.longitude),
+          });
+
+          const response = await fetch(`/api/reverse-geocode?${params}`);
+          const data = (await response.json()) as ReverseGeocodeResponse;
+
+          if (response.ok && data.address?.label) {
+            setLocationLabel(data.address.label);
+          } else {
+            setLocationLabel("Ubicación GPS detectada");
+          }
+        } catch {
+          setLocationLabel("Ubicación GPS detectada");
+        } finally {
+          setLocationStatus("ready");
+        }
       },
       (error) => {
         setCoordinates(null);
         setLocationLabel("");
+        setLocationSource(null);
         setLocationStatus("error");
 
         if (error.code === error.PERMISSION_DENIED) {
@@ -239,6 +274,7 @@ export default function Home() {
 
     setCoordinates(resolvedCoordinates);
     setLocationLabel(data.location.label);
+    setLocationSource("manual");
     setLocationStatus("ready");
 
     return {
@@ -367,7 +403,9 @@ export default function Home() {
                 className="mt-4 flex min-h-14 w-full items-center gap-3 rounded-2xl bg-[#dfff54] px-4 text-left font-black text-[#151a17] transition active:scale-[0.99] disabled:opacity-70"
               >
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#151a17] text-[#dfff54]">
-                  {locationStatus === "ready" && coordinates ? (
+                  {locationStatus === "ready" &&
+                  coordinates &&
+                  locationSource === "gps" ? (
                     <Check size={19} strokeWidth={2.6} />
                   ) : (
                     <Navigation size={18} strokeWidth={2.4} />
@@ -378,19 +416,62 @@ export default function Home() {
                   <div className="text-sm">
                     {locationStatus === "loading"
                       ? "Obteniendo ubicación..."
-                      : locationStatus === "ready" && coordinates
+                      : locationStatus === "ready" &&
+                          coordinates &&
+                          locationSource === "gps"
                         ? "Ubicación preparada"
                         : "Detectar mi ubicación"}
                   </div>
                   <div className="mt-0.5 truncate text-[11px] font-semibold text-[#555e27]">
-                    {locationStatus === "ready" && coordinates
-                      ? locationLabel || "Lista para buscar"
+                    {locationStatus === "ready" &&
+                    coordinates &&
+                    locationSource === "gps"
+                      ? "GPS detectado correctamente"
                       : "Usa el GPS del dispositivo"}
                   </div>
                 </div>
 
                 <ChevronRight size={18} />
               </button>
+
+              {locationStatus === "ready" &&
+                coordinates &&
+                locationSource === "gps" &&
+                locationLabel && (
+                  <div className="mt-2 rounded-2xl border border-[#dfe5df] bg-[#f7f9f4] p-3.5">
+                    <div className="flex items-start gap-2.5">
+                      <MapPin
+                        size={17}
+                        className="mt-0.5 shrink-0 text-[#536020]"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#7b847d]">
+                          Dirección detectada
+                        </p>
+                        <p className="mt-1 text-sm font-bold leading-5 text-[#283028]">
+                          {locationLabel}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCoordinates(null);
+                        setLocationLabel("");
+                        setLocationSource(null);
+                        setLocationStatus("idle");
+                        setManualLocation("");
+                        setShowManualLocation(true);
+                        setMessage("");
+                        resetResults();
+                      }}
+                      className="mt-3 text-xs font-black text-[#526018] underline decoration-[#94a34b] underline-offset-4"
+                    >
+                      ¿No es correcta? Escribir otra ubicación
+                    </button>
+                  </div>
+                )}
 
               <button
                 type="button"
@@ -421,6 +502,7 @@ export default function Home() {
                       setManualLocation(value);
                       setCoordinates(null);
                       setLocationLabel("");
+                      setLocationSource(null);
                       setLocationStatus("idle");
                       setMessage("");
                       resetResults();
