@@ -54,6 +54,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/auth") ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/api/geocode") ||
+    pathname.startsWith("/api/reverse-geocode") ||
     pathname.startsWith("/api/locksmiths/nearby");
 
   if (!user && !isPublicPath) {
