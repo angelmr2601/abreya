@@ -56,7 +56,9 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/geocode") ||
     pathname.startsWith("/api/reverse-geocode") ||
     pathname.startsWith("/api/locksmiths/nearby") ||
-    pathname.startsWith("/cerrajero/");
+    pathname.startsWith("/api/service-requests") ||
+    pathname.startsWith("/cerrajero/") ||
+    pathname.startsWith("/solicitar/");
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone();
