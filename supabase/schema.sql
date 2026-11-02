@@ -105,6 +105,9 @@ create table if not exists public.service_requests (
 create index if not exists service_requests_locksmith_status_created_idx
   on public.service_requests (locksmith_id, status, created_at desc);
 
+create index if not exists service_requests_service_id_idx
+  on public.service_requests (service_id);
+
 insert into public.services (slug, name)
 values
   ('door', 'Me he quedado fuera'),
