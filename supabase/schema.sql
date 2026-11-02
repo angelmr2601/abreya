@@ -129,6 +129,11 @@ grant select on public.services to anon, authenticated;
 grant select on public.locksmith_services to anon, authenticated;
 revoke all on table public.service_requests from anon, authenticated;
 grant insert on table public.service_requests to anon, authenticated;
+grant select on table public.service_requests to authenticated;
+grant update (status) on table public.service_requests to authenticated;
+
+revoke update on table public.locksmiths from authenticated;
+grant update (is_available) on table public.locksmiths to authenticated;
 
 drop policy if exists "Public can read active locksmiths"
   on public.locksmiths;
@@ -165,6 +170,99 @@ create policy "Public can create pending service requests"
   for insert
   to anon, authenticated
   with check (status = 'pending');
+
+drop policy if exists "Locksmith owners can read own requests"
+  on public.service_requests;
+
+create policy "Locksmith owners can read own requests"
+  on public.service_requests
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.locksmiths as l
+      where l.id = service_requests.locksmith_id
+        and l.user_id = (select auth.uid())
+    )
+  );
+
+drop policy if exists "Locksmith owners can update own requests"
+  on public.service_requests;
+
+create policy "Locksmith owners can update own requests"
+  on public.service_requests
+  for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.locksmiths as l
+      where l.id = service_requests.locksmith_id
+        and l.user_id = (select auth.uid())
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.locksmiths as l
+      where l.id = service_requests.locksmith_id
+        and l.user_id = (select auth.uid())
+    )
+  );
+
+drop policy if exists "Locksmith owners can update availability"
+  on public.locksmiths;
+
+create policy "Locksmith owners can update availability"
+  on public.locksmiths
+  for update
+  to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
+
+create or replace function public.guard_service_request_status_transition()
+returns trigger
+language plpgsql
+set search_path = ''
+as $
+begin
+  if new.status = old.status then
+    return new;
+  end if;
+
+  if not (
+    (old.status = 'pending' and new.status in ('accepted', 'cancelled'))
+    or (old.status = 'accepted' and new.status in ('on_the_way', 'cancelled'))
+    or (old.status = 'on_the_way' and new.status in ('completed', 'cancelled'))
+  ) then
+    raise exception 'Invalid service request status transition: % -> %',
+      old.status,
+      new.status;
+  end if;
+
+  if new.status = 'accepted' and old.accepted_at is null then
+    new.accepted_at := now();
+  end if;
+
+  if new.status = 'completed' and old.completed_at is null then
+    new.completed_at := now();
+  end if;
+
+  return new;
+end;
+$;
+
+revoke all on function public.guard_service_request_status_transition()
+from public, anon, authenticated;
+
+drop trigger if exists service_requests_guard_status_transition
+  on public.service_requests;
+
+create trigger service_requests_guard_status_transition
+before update of status on public.service_requests
+for each row
+execute function public.guard_service_request_status_transition();
 
 create or replace function public.nearby_locksmiths(
   user_lat double precision,
