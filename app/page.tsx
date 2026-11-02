@@ -1,6 +1,11 @@
 "use client";
 
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import {
   Check,
   ChevronRight,
@@ -8,7 +13,9 @@ import {
   KeyRound,
   Lock,
   MapPin,
+  MessageCircle,
   Navigation,
+  Phone,
   Search,
   ShieldCheck,
   Star,
@@ -42,6 +49,40 @@ const services = [
   },
 ];
 
+type Coordinates = {
+  latitude: number;
+  longitude: number;
+};
+
+type NearbyLocksmith = {
+  id: string;
+  business_name: string;
+  slug: string;
+  phone: string | null;
+  whatsapp: string | null;
+  municipality: string | null;
+  province: string | null;
+  rating: number | string;
+  review_count: number;
+  verified: boolean;
+  is_available: boolean;
+  plan: "free" | "pro" | "premium";
+  distance_km: number;
+  starting_price: number | string | null;
+};
+
+type GeocodeResponse = {
+  location?: Coordinates & {
+    label: string;
+  };
+  error?: string;
+};
+
+type NearbyResponse = {
+  locksmiths?: NearbyLocksmith[];
+  error?: string;
+};
+
 export default function Home() {
   const [selectedService, setSelectedService] = useState("door");
   const [manualLocation, setManualLocation] = useState("");
@@ -49,19 +90,28 @@ export default function Home() {
   const [locationStatus, setLocationStatus] = useState<
     "idle" | "loading" | "ready" | "error"
   >("idle");
-  const [coordinates, setCoordinates] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
+  const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
+  const [locationLabel, setLocationLabel] = useState("");
   const [message, setMessage] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [searchLabel, setSearchLabel] = useState("");
+  const [results, setResults] = useState<NearbyLocksmith[]>([]);
 
   const selectedServiceLabel = useMemo(
     () => services.find((service) => service.id === selectedService)?.title ?? "",
-    [selectedService]
+    [selectedService],
   );
+
+  function resetResults() {
+    setHasSearched(false);
+    setResults([]);
+    setSearchLabel("");
+  }
 
   function useCurrentLocation() {
     setMessage("");
+    resetResults();
 
     if (!navigator.geolocation) {
       setLocationStatus("error");
@@ -78,39 +128,122 @@ export default function Home() {
           latitude: coords.latitude,
           longitude: coords.longitude,
         });
+        setManualLocation("");
+        setLocationLabel("Tu ubicación actual");
         setLocationStatus("ready");
         setShowManualLocation(false);
         setMessage("");
       },
       () => {
         setCoordinates(null);
+        setLocationLabel("");
         setLocationStatus("error");
         setShowManualLocation(true);
         setMessage(
-          "No hemos podido obtener tu ubicación. Puedes escribirla manualmente."
+          "No hemos podido obtener tu ubicación. Puedes escribirla manualmente.",
         );
       },
       {
         enableHighAccuracy: false,
         timeout: 8000,
         maximumAge: 300000,
-      }
+      },
     );
   }
 
-  function handleSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const hasLocation = coordinates || manualLocation.trim();
-
-    if (!hasLocation) {
-      setMessage("Necesitamos tu ubicación para buscar cerrajeros cercanos.");
-      return;
+  async function resolveLocation(): Promise<{
+    coordinates: Coordinates;
+    label: string;
+  }> {
+    if (coordinates) {
+      return {
+        coordinates,
+        label: locationLabel || "Tu ubicación actual",
+      };
     }
 
-    setMessage(
-      `Buscaremos cerrajeros para “${selectedServiceLabel}”. En el siguiente paso conectaremos esta búsqueda con profesionales reales.`
+    const query = manualLocation.trim();
+
+    if (!query) {
+      throw new Error(
+        "Necesitamos tu ubicación para buscar cerrajeros cercanos.",
+      );
+    }
+
+    const response = await fetch(
+      `/api/geocode?q=${encodeURIComponent(query)}`,
     );
+    const data = (await response.json()) as GeocodeResponse;
+
+    if (!response.ok || !data.location) {
+      throw new Error(
+        data.error ?? "No hemos podido localizar el lugar que has escrito.",
+      );
+    }
+
+    const resolvedCoordinates = {
+      latitude: data.location.latitude,
+      longitude: data.location.longitude,
+    };
+
+    setCoordinates(resolvedCoordinates);
+    setLocationLabel(data.location.label);
+    setLocationStatus("ready");
+
+    return {
+      coordinates: resolvedCoordinates,
+      label: query,
+    };
+  }
+
+  async function handleSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (searching) return;
+
+    setSearching(true);
+    setMessage("");
+
+    try {
+      const resolved = await resolveLocation();
+
+      const params = new URLSearchParams({
+        lat: String(resolved.coordinates.latitude),
+        lng: String(resolved.coordinates.longitude),
+        service: selectedService,
+        radius: "30",
+      });
+
+      const response = await fetch(`/api/locksmiths/nearby?${params}`);
+      const data = (await response.json()) as NearbyResponse;
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ?? "No se han podido buscar cerrajeros cercanos.",
+        );
+      }
+
+      setResults(data.locksmiths ?? []);
+      setHasSearched(true);
+      setSearchLabel(resolved.label);
+
+      window.setTimeout(() => {
+        document.getElementById("resultados")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 80);
+    } catch (error) {
+      setHasSearched(false);
+      setResults([]);
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Ha ocurrido un error durante la búsqueda.",
+      );
+    } finally {
+      setSearching(false);
+    }
   }
 
   return (
@@ -179,11 +312,11 @@ export default function Home() {
               <button
                 type="button"
                 onClick={useCurrentLocation}
-                disabled={locationStatus === "loading"}
+                disabled={locationStatus === "loading" || searching}
                 className="mt-4 flex min-h-14 w-full items-center gap-3 rounded-2xl bg-[#dfff54] px-4 text-left font-black text-[#151a17] transition active:scale-[0.99] disabled:opacity-70"
               >
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#151a17] text-[#dfff54]">
-                  {locationStatus === "ready" ? (
+                  {locationStatus === "ready" && coordinates ? (
                     <Check size={19} strokeWidth={2.6} />
                   ) : (
                     <Navigation size={18} strokeWidth={2.4} />
@@ -194,13 +327,13 @@ export default function Home() {
                   <div className="text-sm">
                     {locationStatus === "loading"
                       ? "Obteniendo ubicación..."
-                      : locationStatus === "ready"
-                        ? "Ubicación detectada"
+                      : locationStatus === "ready" && coordinates
+                        ? "Ubicación preparada"
                         : "Usar mi ubicación actual"}
                   </div>
-                  <div className="mt-0.5 text-[11px] font-semibold text-[#555e27]">
-                    {locationStatus === "ready"
-                      ? "Lista para buscar profesionales cercanos"
+                  <div className="mt-0.5 truncate text-[11px] font-semibold text-[#555e27]">
+                    {locationStatus === "ready" && coordinates
+                      ? locationLabel || "Lista para buscar"
                       : "La forma más rápida"}
                   </div>
                 </div>
@@ -214,7 +347,8 @@ export default function Home() {
                   setShowManualLocation((current) => !current);
                   setMessage("");
                 }}
-                className="mt-2 flex min-h-12 w-full items-center gap-3 rounded-2xl border border-[#e1e5e2] bg-[#fafbfa] px-4 text-left text-sm font-bold text-[#4e5851]"
+                disabled={searching}
+                className="mt-2 flex min-h-12 w-full items-center gap-3 rounded-2xl border border-[#e1e5e2] bg-[#fafbfa] px-4 text-left text-sm font-bold text-[#4e5851] disabled:opacity-70"
               >
                 <MapPin size={18} />
                 Escribir ubicación
@@ -231,16 +365,19 @@ export default function Home() {
                     id="location"
                     value={manualLocation}
                     onChange={(event) => {
-                      setManualLocation(event.target.value);
-                      if (event.target.value.trim()) {
-                        setCoordinates(null);
-                        setLocationStatus("idle");
-                      }
+                      const value = event.target.value;
+
+                      setManualLocation(value);
+                      setCoordinates(null);
+                      setLocationLabel("");
+                      setLocationStatus("idle");
                       setMessage("");
+                      resetResults();
                     }}
                     placeholder="Ej. Marchena o 41620"
                     autoComplete="postal-code"
-                    className="h-14 w-full rounded-2xl border border-[#dfe4e0] bg-white px-4 text-base font-semibold outline-none transition placeholder:font-medium placeholder:text-[#9ba39d] focus:border-[#1b231d]"
+                    disabled={searching}
+                    className="h-14 w-full rounded-2xl border border-[#dfe4e0] bg-white px-4 text-base font-semibold outline-none transition placeholder:font-medium placeholder:text-[#9ba39d] focus:border-[#1b231d] disabled:opacity-70"
                   />
                 </div>
               )}
@@ -266,11 +403,13 @@ export default function Home() {
                     <button
                       key={service.id}
                       type="button"
+                      disabled={searching}
                       onClick={() => {
                         setSelectedService(service.id);
                         setMessage("");
+                        resetResults();
                       }}
-                      className={`flex min-h-[58px] items-center gap-3 rounded-2xl border px-3.5 text-left transition active:scale-[0.995] ${
+                      className={`flex min-h-[58px] items-center gap-3 rounded-2xl border px-3.5 text-left transition active:scale-[0.995] disabled:opacity-70 ${
                         active
                           ? "border-[#1b231d] bg-[#f0f7ce]"
                           : "border-[#e3e7e4] bg-[#fafbfa]"
@@ -312,10 +451,11 @@ export default function Home() {
 
             <button
               type="submit"
-              className="mt-4 hidden h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#182019] text-sm font-black text-white transition hover:bg-[#252e27] md:flex"
+              disabled={searching}
+              className="mt-4 hidden h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#182019] text-sm font-black text-white transition hover:bg-[#252e27] disabled:cursor-wait disabled:opacity-70 md:flex"
             >
               <Search size={18} strokeWidth={2.5} />
-              Buscar cerrajeros
+              {searching ? "Buscando..." : "Buscar cerrajeros"}
             </button>
 
             <p className="mt-3 text-center text-[11px] font-medium text-[#8b948e]">
@@ -324,6 +464,59 @@ export default function Home() {
           </form>
         </div>
       </section>
+
+      {hasSearched && (
+        <section
+          id="resultados"
+          className="scroll-mt-4 border-b border-[#e4e7e4] bg-white"
+        >
+          <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 md:py-12">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#778179]">
+                  Resultados
+                </p>
+                <h2 className="mt-1.5 text-2xl font-black tracking-[-0.04em] md:text-3xl">
+                  Cerrajeros cerca de {searchLabel}
+                </h2>
+                <p className="mt-2 text-sm text-[#747d77]">
+                  {selectedServiceLabel}
+                </p>
+              </div>
+
+              <span className="shrink-0 rounded-full bg-[#f1f3f1] px-3 py-1.5 text-xs font-black text-[#586159]">
+                {results.length}
+              </span>
+            </div>
+
+            {results.length === 0 ? (
+              <div className="mt-5 rounded-[24px] border border-[#e1e5e2] bg-[#f8f9f7] p-6 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white">
+                  <Search size={20} />
+                </div>
+                <h3 className="mt-4 text-lg font-black">
+                  Aún no hay profesionales disponibles aquí
+                </h3>
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#747d77]">
+                  La búsqueda funciona, pero todavía necesitamos incorporar
+                  cerrajeros que cubran esta zona.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                {results.map((locksmith) => (
+                  <LocksmithCard key={locksmith.id} locksmith={locksmith} />
+                ))}
+              </div>
+            )}
+
+            <p className="mt-5 text-center text-[10px] leading-4 text-[#8a938c]">
+              Las ubicaciones escritas se convierten a coordenadas mediante
+              OpenStreetMap Nominatim durante esta fase MVP.
+            </p>
+          </div>
+        </section>
+      )}
 
       <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 md:py-16">
         <div className="grid gap-3 md:grid-cols-3">
@@ -374,7 +567,7 @@ export default function Home() {
 
       <footer className="border-t border-[#e1e5e2] bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-6 text-xs text-[#778079] sm:px-6">
-          <span className="font-black text-[#1a211c]">AbreYa</span>
+          <span className="font-black text-[#1a211d]">AbreYa</span>
           <span>Tu cerrajero, cuando lo necesitas.</span>
         </div>
       </footer>
@@ -383,14 +576,114 @@ export default function Home() {
         <form onSubmit={handleSearch}>
           <button
             type="submit"
-            className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#182019] text-sm font-black text-white shadow-[0_10px_28px_rgba(0,0,0,0.18)]"
+            disabled={searching}
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#182019] text-sm font-black text-white shadow-[0_10px_28px_rgba(0,0,0,0.18)] disabled:cursor-wait disabled:opacity-70"
           >
             <Search size={18} strokeWidth={2.5} />
-            Buscar cerrajeros
+            {searching ? "Buscando..." : "Buscar cerrajeros"}
           </button>
         </form>
       </div>
     </main>
+  );
+}
+
+function LocksmithCard({ locksmith }: { locksmith: NearbyLocksmith }) {
+  const rating = Number(locksmith.rating);
+  const startingPrice =
+    locksmith.starting_price === null ? null : Number(locksmith.starting_price);
+
+  return (
+    <article className="rounded-[22px] border border-[#e0e4e1] bg-white p-5 shadow-[0_10px_28px_rgba(20,30,23,0.04)]">
+      <div className="flex flex-wrap gap-2">
+        <span
+          className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] ${
+            locksmith.is_available
+              ? "bg-[#e8f8da] text-[#397321]"
+              : "bg-[#f1f2f1] text-[#747b76]"
+          }`}
+        >
+          {locksmith.is_available ? "Disponible ahora" : "No disponible"}
+        </span>
+
+        {locksmith.verified && (
+          <span className="rounded-full bg-[#eef3ff] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-[#405b9b]">
+            Verificado
+          </span>
+        )}
+
+        {locksmith.plan !== "free" && (
+          <span className="rounded-full bg-[#fff5c9] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-[#7b6200]">
+            Destacado
+          </span>
+        )}
+      </div>
+
+      <h3 className="mt-3 text-lg font-black tracking-[-0.025em]">
+        {locksmith.business_name}
+      </h3>
+
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-[#69726c]">
+        <span className="flex items-center gap-1">
+          <Star size={14} className="fill-[#d6a900] text-[#d6a900]" />
+          {Number.isFinite(rating) ? rating.toFixed(1) : "—"}
+          <span className="font-medium text-[#949b96]">
+            ({locksmith.review_count})
+          </span>
+        </span>
+
+        <span className="flex items-center gap-1">
+          <Navigation size={14} />
+          {Number(locksmith.distance_km).toFixed(1)} km
+        </span>
+
+        {locksmith.municipality && (
+          <span className="flex items-center gap-1">
+            <MapPin size={14} />
+            {locksmith.municipality}
+          </span>
+        )}
+      </div>
+
+      {startingPrice !== null && Number.isFinite(startingPrice) && (
+        <div className="mt-4 rounded-2xl bg-[#f6f7f4] px-4 py-3">
+          <div className="text-[10px] font-black uppercase tracking-[0.12em] text-[#818982]">
+            Precio orientativo desde
+          </div>
+          <div className="mt-1 text-xl font-black">
+            {startingPrice.toFixed(0)} €
+          </div>
+        </div>
+      )}
+
+      {(locksmith.phone || locksmith.whatsapp) && (
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          {locksmith.phone ? (
+            <a
+              href={`tel:${locksmith.phone}`}
+              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-[#dfe3df] text-sm font-black"
+            >
+              <Phone size={17} />
+              Llamar
+            </a>
+          ) : (
+            <span />
+          )}
+
+          {locksmith.whatsapp ? (
+            <a
+              href={`https://wa.me/${locksmith.whatsapp.replace(/\D/g, "")}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#182019] text-sm font-black text-white"
+            >
+              <MessageCircle size={17} />
+              WhatsApp
+            </a>
+          ) : null}
+        </div>
+      )}
+    </article>
   );
 }
 
