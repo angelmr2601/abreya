@@ -66,7 +66,7 @@ export default async function LocksmithProfilePage({ params }: PageProps) {
     .eq("is_active", true)
     .maybeSingle();
 
-  const locksmith = locksmithData as LocksmithRow | null;
+  const locksmith = locksmithData as unknown as LocksmithRow | null;
 
   if (error || !locksmith) {
     notFound();
