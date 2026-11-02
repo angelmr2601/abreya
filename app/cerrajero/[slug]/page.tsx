@@ -32,37 +32,41 @@ type LocksmithServiceRow = {
   starting_price: number | string | null;
 };
 
+type LocksmithRow = {
+  id: string;
+  business_name: string;
+  slug: string;
+  phone: string | null;
+  whatsapp: string | null;
+  municipality: string | null;
+  province: string | null;
+  coverage_radius_km: number;
+  is_available: boolean;
+  is_active: boolean;
+  verified: boolean;
+  plan: "free" | "pro" | "premium";
+  rating: number | string;
+  review_count: number;
+  description: string | null;
+  years_experience: number | null;
+  response_time_min: number | null;
+  works_24h: boolean;
+};
+
 export default async function LocksmithProfilePage({ params }: PageProps) {
   const { slug } = await params;
   const supabase = await createClient();
 
-  const { data: locksmith, error } = await supabase
+  const { data: locksmithData, error } = await supabase
     .from("locksmiths")
     .select(
-      [
-        "id",
-        "business_name",
-        "slug",
-        "phone",
-        "whatsapp",
-        "municipality",
-        "province",
-        "coverage_radius_km",
-        "is_available",
-        "is_active",
-        "verified",
-        "plan",
-        "rating",
-        "review_count",
-        "description",
-        "years_experience",
-        "response_time_min",
-        "works_24h",
-      ].join(","),
+      "id,business_name,slug,phone,whatsapp,municipality,province,coverage_radius_km,is_available,is_active,verified,plan,rating,review_count,description,years_experience,response_time_min,works_24h",
     )
     .eq("slug", slug)
     .eq("is_active", true)
     .maybeSingle();
+
+  const locksmith = locksmithData as LocksmithRow | null;
 
   if (error || !locksmith) {
     notFound();
