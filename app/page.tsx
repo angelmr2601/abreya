@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   useMemo,
   useState,
@@ -796,6 +797,14 @@ function LocksmithCard({ locksmith }: { locksmith: NearbyLocksmith }) {
           </div>
         </div>
       )}
+
+      <Link
+        href={`/cerrajero/${locksmith.slug}`}
+        className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#182019] text-sm font-black text-white"
+      >
+        Ver perfil
+        <ChevronRight size={17} />
+      </Link>
 
       {(locksmith.phone || locksmith.whatsapp) && (
         <div className="mt-4 grid grid-cols-2 gap-2">
