@@ -109,14 +109,41 @@ export default function Home() {
     setSearchLabel("");
   }
 
-  function useCurrentLocation() {
+  async function useCurrentLocation() {
     setMessage("");
     resetResults();
+
+    if (!window.isSecureContext) {
+      setLocationStatus("error");
+      setMessage(
+        "El navegador no considera esta página un contexto seguro para usar la ubicación.",
+      );
+      return;
+    }
 
     if (!navigator.geolocation) {
       setLocationStatus("error");
       setMessage(
-        "Tu navegador no permite usar la ubicación automática. Pulsa “Escribir ubicación” para introducirla manualmente.",
+        "Tu navegador no dispone de la API de geolocalización. Pulsa “Escribir ubicación”.",
+      );
+      return;
+    }
+
+    let permissionState: PermissionState | "unknown" = "unknown";
+
+    try {
+      const permission = await navigator.permissions.query({
+        name: "geolocation",
+      });
+      permissionState = permission.state;
+    } catch {
+      // Algunos navegadores no permiten consultar este permiso.
+    }
+
+    if (permissionState === "denied") {
+      setLocationStatus("error");
+      setMessage(
+        "Chrome indica que la ubicación está bloqueada para esta página. Restablece el permiso del sitio y vuelve a intentarlo.",
       );
       return;
     }
@@ -142,18 +169,34 @@ export default function Home() {
 
         if (error.code === error.PERMISSION_DENIED) {
           setMessage(
-            "No has permitido acceder a tu ubicación. Puedes volver a intentarlo o pulsar “Escribir ubicación”.",
+            permissionState === "granted"
+              ? "Chrome tiene permiso, pero Windows o una política del navegador está bloqueando la ubicación (error 1: PERMISSION_DENIED)."
+              : "El navegador ha rechazado el acceso a la ubicación (error 1: PERMISSION_DENIED).",
+          );
+          return;
+        }
+
+        if (error.code === error.POSITION_UNAVAILABLE) {
+          setMessage(
+            "El permiso está concedido, pero el dispositivo no ha podido calcular una posición (error 2: POSITION_UNAVAILABLE).",
+          );
+          return;
+        }
+
+        if (error.code === error.TIMEOUT) {
+          setMessage(
+            "El navegador no ha conseguido una posición en 10 segundos (error 3: TIMEOUT).",
           );
           return;
         }
 
         setMessage(
-          "No hemos podido detectar tu ubicación. Puedes volver a intentarlo o pulsar “Escribir ubicación”.",
+          `No hemos podido detectar tu ubicación (error ${error.code}: ${error.message || "desconocido"}).`,
         );
       },
       {
         enableHighAccuracy: false,
-        timeout: 8000,
+        timeout: 10000,
         maximumAge: 300000,
       },
     );
