@@ -63,6 +63,9 @@ create table if not exists public.locksmith_services (
   primary key (locksmith_id, service_id)
 );
 
+create index if not exists locksmith_services_service_id_idx
+  on public.locksmith_services (service_id);
+
 insert into public.services (slug, name)
 values
   ('door', 'Me he quedado fuera'),
