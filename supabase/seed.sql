@@ -112,3 +112,41 @@ where l.slug in (
   'cerrajeria-marchena-demo'
 )
 on conflict (locksmith_id, service_id) do nothing;
+
+
+update public.locksmiths
+set
+  description = case slug
+    when 'cerrajeria-marchena-demo' then 'Profesional de prueba para el MVP de AbreYa. Atiende aperturas, incidencias con cerraduras y cambios de bombín en Marchena y alrededores.'
+    when 'cerrajeria-centro-demo' then 'Perfil demo para probar la búsqueda y la ficha pública de profesionales en Sevilla.'
+    when 'llave-rapida-demo' then 'Perfil destacado de prueba con atención rápida para servicios urgentes de cerrajería.'
+    when 'cerrajero-sur-demo' then 'Perfil demo para comprobar disponibilidad, cobertura y servicios en Dos Hermanas.'
+    else description
+  end,
+  years_experience = case slug
+    when 'cerrajeria-marchena-demo' then 8
+    when 'cerrajeria-centro-demo' then 12
+    when 'llave-rapida-demo' then 15
+    when 'cerrajero-sur-demo' then 6
+    else years_experience
+  end,
+  response_time_min = case slug
+    when 'cerrajeria-marchena-demo' then 20
+    when 'cerrajeria-centro-demo' then 25
+    when 'llave-rapida-demo' then 15
+    when 'cerrajero-sur-demo' then 30
+    else response_time_min
+  end,
+  works_24h = case slug
+    when 'cerrajeria-marchena-demo' then true
+    when 'cerrajeria-centro-demo' then false
+    when 'llave-rapida-demo' then true
+    when 'cerrajero-sur-demo' then false
+    else works_24h
+  end
+where slug in (
+  'cerrajeria-marchena-demo',
+  'cerrajeria-centro-demo',
+  'llave-rapida-demo',
+  'cerrajero-sur-demo'
+);
