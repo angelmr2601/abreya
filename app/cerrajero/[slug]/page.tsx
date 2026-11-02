@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 
+export const instant = false;
+
 type PageProps = {
   params: Promise<{
     slug: string;
