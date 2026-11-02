@@ -65,6 +65,22 @@ values
     'free',
     4.5,
     17
+  ),
+  (
+    'Cerrajería Marchena Demo',
+    'cerrajeria-marchena-demo',
+    null,
+    null,
+    'Marchena',
+    'Sevilla',
+    37.329,
+    -5.416,
+    30,
+    true,
+    true,
+    'free',
+    4.7,
+    23
   )
 on conflict (slug) do nothing;
 
@@ -77,6 +93,10 @@ select
   l.id,
   s.id,
   case
+    when l.slug = 'cerrajeria-marchena-demo' and s.slug = 'door' then 65
+    when l.slug = 'cerrajeria-marchena-demo' and s.slug = 'lost' then 75
+    when l.slug = 'cerrajeria-marchena-demo' and s.slug = 'broken' then 60
+    when l.slug = 'cerrajeria-marchena-demo' and s.slug = 'change' then 85
     when s.slug = 'door' then 70
     when s.slug = 'lost' then 80
     when s.slug = 'broken' then 65
@@ -88,6 +108,7 @@ cross join public.services as s
 where l.slug in (
   'cerrajeria-centro-demo',
   'llave-rapida-demo',
-  'cerrajero-sur-demo'
+  'cerrajero-sur-demo',
+  'cerrajeria-marchena-demo'
 )
 on conflict (locksmith_id, service_id) do nothing;
