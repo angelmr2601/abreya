@@ -301,8 +301,15 @@ export default async function LocksmithProfilePage({ params }: PageProps) {
             Contacta directamente. AbreYa no cobra por ponerte en contacto.
           </p>
 
+          <Link
+            href={`/solicitar/${locksmith.slug}`}
+            className="mt-5 flex min-h-12 items-center justify-center rounded-2xl bg-[#dfff54] px-4 text-sm font-black text-[#151a17]"
+          >
+            Solicitar ayuda
+          </Link>
+
           {locksmith.phone || locksmith.whatsapp ? (
-            <div className="mt-5 grid gap-2">
+            <div className="mt-3 grid gap-2">
               {locksmith.phone && (
                 <a
                   href={`tel:${locksmith.phone}`}
@@ -334,29 +341,14 @@ export default async function LocksmithProfilePage({ params }: PageProps) {
         </aside>
       </div>
 
-      {(locksmith.phone || locksmith.whatsapp) && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 p-3 pb-[calc(12px+env(safe-area-inset-bottom))] backdrop-blur md:hidden">
-          {locksmith.phone ? (
-            <a
-              href={`tel:${locksmith.phone}`}
-              className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#182019] text-sm font-black text-white"
-            >
-              <Phone size={18} />
-              Llamar ahora
-            </a>
-          ) : whatsappNumber ? (
-            <a
-              href={`https://wa.me/${whatsappNumber}`}
-              target="_blank"
-              rel="noreferrer"
-              className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#182019] text-sm font-black text-white"
-            >
-              <MessageCircle size={18} />
-              Abrir WhatsApp
-            </a>
-          ) : null}
-        </div>
-      )}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/5 bg-white/95 p-3 pb-[calc(12px+env(safe-area-inset-bottom))] backdrop-blur md:hidden">
+        <Link
+          href={`/solicitar/${locksmith.slug}`}
+          className="flex h-14 w-full items-center justify-center rounded-2xl bg-[#182019] text-sm font-black text-white"
+        >
+          Solicitar ayuda
+        </Link>
+      </div>
     </main>
   );
 }
