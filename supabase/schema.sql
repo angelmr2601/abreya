@@ -72,6 +72,39 @@ create table if not exists public.locksmith_services (
 create index if not exists locksmith_services_service_id_idx
   on public.locksmith_services (service_id);
 
+create table if not exists public.service_requests (
+  id uuid primary key default gen_random_uuid(),
+  locksmith_id uuid not null
+    references public.locksmiths(id) on delete restrict,
+  service_id bigint not null
+    references public.services(id) on delete restrict,
+  customer_name text,
+  customer_phone text not null,
+  address_text text not null,
+  latitude double precision
+    check (latitude is null or latitude between -90 and 90),
+  longitude double precision
+    check (longitude is null or longitude between -180 and 180),
+  details text,
+  status text not null default 'pending'
+    check (status in ('pending', 'accepted', 'on_the_way', 'completed', 'cancelled')),
+  created_at timestamptz not null default now(),
+  accepted_at timestamptz,
+  completed_at timestamptz,
+  check (
+    (latitude is null and longitude is null)
+    or
+    (latitude is not null and longitude is not null)
+  ),
+  check (char_length(customer_phone) between 7 and 30),
+  check (char_length(address_text) between 3 and 300),
+  check (customer_name is null or char_length(customer_name) <= 100),
+  check (details is null or char_length(details) <= 1000)
+);
+
+create index if not exists service_requests_locksmith_status_created_idx
+  on public.service_requests (locksmith_id, status, created_at desc);
+
 insert into public.services (slug, name)
 values
   ('door', 'Me he quedado fuera'),
@@ -86,10 +119,13 @@ set
 alter table public.locksmiths enable row level security;
 alter table public.services enable row level security;
 alter table public.locksmith_services enable row level security;
+alter table public.service_requests enable row level security;
 
 grant select on public.locksmiths to anon, authenticated;
 grant select on public.services to anon, authenticated;
 grant select on public.locksmith_services to anon, authenticated;
+revoke all on table public.service_requests from anon, authenticated;
+grant insert on table public.service_requests to anon, authenticated;
 
 drop policy if exists "Public can read active locksmiths"
   on public.locksmiths;
@@ -117,6 +153,15 @@ create policy "Public can read locksmith services"
   for select
   to anon, authenticated
   using (true);
+
+drop policy if exists "Public can create pending service requests"
+  on public.service_requests;
+
+create policy "Public can create pending service requests"
+  on public.service_requests
+  for insert
+  to anon, authenticated
+  with check (status = 'pending');
 
 create or replace function public.nearby_locksmiths(
   user_lat double precision,
