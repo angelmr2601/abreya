@@ -115,8 +115,9 @@ export default function Home() {
 
     if (!navigator.geolocation) {
       setLocationStatus("error");
-      setShowManualLocation(true);
-      setMessage("Tu navegador no permite usar la ubicación. Escríbela manualmente.");
+      setMessage(
+        "Tu navegador no permite usar la ubicación automática. Pulsa “Escribir ubicación” para introducirla manualmente.",
+      );
       return;
     }
 
@@ -134,13 +135,20 @@ export default function Home() {
         setShowManualLocation(false);
         setMessage("");
       },
-      () => {
+      (error) => {
         setCoordinates(null);
         setLocationLabel("");
         setLocationStatus("error");
-        setShowManualLocation(true);
+
+        if (error.code === error.PERMISSION_DENIED) {
+          setMessage(
+            "No has permitido acceder a tu ubicación. Puedes volver a intentarlo o pulsar “Escribir ubicación”.",
+          );
+          return;
+        }
+
         setMessage(
-          "No hemos podido obtener tu ubicación. Puedes escribirla manualmente.",
+          "No hemos podido detectar tu ubicación. Puedes volver a intentarlo o pulsar “Escribir ubicación”.",
         );
       },
       {
@@ -329,12 +337,12 @@ export default function Home() {
                       ? "Obteniendo ubicación..."
                       : locationStatus === "ready" && coordinates
                         ? "Ubicación preparada"
-                        : "Usar mi ubicación actual"}
+                        : "Detectar mi ubicación"}
                   </div>
                   <div className="mt-0.5 truncate text-[11px] font-semibold text-[#555e27]">
                     {locationStatus === "ready" && coordinates
                       ? locationLabel || "Lista para buscar"
-                      : "La forma más rápida"}
+                      : "Usa el GPS del dispositivo"}
                   </div>
                 </div>
 
