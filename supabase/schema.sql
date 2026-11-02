@@ -35,6 +35,12 @@ create table if not exists public.locksmiths (
     check (rating between 0 and 5),
   review_count integer not null default 0
     check (review_count >= 0),
+  description text,
+  years_experience integer
+    check (years_experience is null or years_experience between 0 and 80),
+  response_time_min integer
+    check (response_time_min is null or response_time_min between 1 and 240),
+  works_24h boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
