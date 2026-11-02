@@ -511,8 +511,16 @@ export default function Home() {
             )}
 
             <p className="mt-5 text-center text-[10px] leading-4 text-[#8a938c]">
-              Las ubicaciones escritas se convierten a coordenadas mediante
-              OpenStreetMap Nominatim durante esta fase MVP.
+              Geocodificación del MVP con{" "}
+              <a
+                href="https://www.openstreetmap.org/copyright"
+                target="_blank"
+                rel="noreferrer"
+                className="font-bold underline underline-offset-2"
+              >
+                © OpenStreetMap contributors
+              </a>
+              .
             </p>
           </div>
         </section>
