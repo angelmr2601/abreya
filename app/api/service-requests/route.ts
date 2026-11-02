@@ -136,6 +136,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (!locksmith.is_available) {
+    return NextResponse.json(
+      { error: "Este profesional ya no aparece como disponible." },
+      { status: 409 },
+    );
+  }
+
   const { data: serviceData, error: serviceError } = await supabase
     .from("services")
     .select("id,name")
