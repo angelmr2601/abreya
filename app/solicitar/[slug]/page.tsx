@@ -4,6 +4,8 @@ import { ArrowLeft, KeyRound, MapPin, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import ServiceRequestForm from "./request-form";
 
+export const instant = false;
+
 type PageProps = {
   params: Promise<{
     slug: string;
