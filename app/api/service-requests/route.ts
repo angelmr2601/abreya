@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -177,6 +178,13 @@ export async function POST(request: NextRequest) {
   }
 
   const requestId = crypto.randomUUID();
+  const trackingToken = randomBytes(32).toString("base64url");
+  const trackingTokenHash = createHash("sha256")
+    .update(trackingToken)
+    .digest("hex");
+  const trackingExpiresAt = new Date(
+    Date.now() + 30 * 24 * 60 * 60 * 1000,
+  ).toISOString();
 
   const { error: insertError } = await supabase.from("service_requests").insert({
     id: requestId,
@@ -189,6 +197,8 @@ export async function POST(request: NextRequest) {
     longitude,
     details: details || null,
     status: "pending",
+    tracking_token_hash: trackingTokenHash,
+    tracking_expires_at: trackingExpiresAt,
   });
 
   if (insertError) {
@@ -208,6 +218,8 @@ export async function POST(request: NextRequest) {
         status: "pending",
         locksmith: locksmith.business_name,
         service: service.name,
+        trackingToken,
+        trackingExpiresAt,
       },
     },
     { status: 201 },
