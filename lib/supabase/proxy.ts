@@ -58,7 +58,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/locksmiths/nearby") ||
     pathname.startsWith("/api/service-requests") ||
     pathname.startsWith("/cerrajero/") ||
-    pathname.startsWith("/solicitar/");
+    pathname.startsWith("/solicitar/") ||
+    pathname.startsWith("/seguimiento/");
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone();
