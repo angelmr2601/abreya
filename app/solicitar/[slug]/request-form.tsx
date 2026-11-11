@@ -40,6 +40,8 @@ type SubmitResponse = {
     status: string;
     locksmith: string;
     service: string;
+    trackingToken: string;
+    trackingExpiresAt: string;
   };
   error?: string;
 };
@@ -229,6 +231,10 @@ export default function ServiceRequestForm({ locksmith, services }: Props) {
         );
       }
 
+      window.localStorage.setItem(
+        "abreya:lastTrackingToken",
+        data.request.trackingToken,
+      );
       setCreatedRequest(data.request);
     } catch (error) {
       setMessage(
@@ -271,23 +277,22 @@ export default function ServiceRequestForm({ locksmith, services }: Props) {
         </div>
 
         <p className="mx-auto mt-5 max-w-md text-sm leading-6 text-[#6f7972]">
-          En esta fase del MVP la solicitud queda registrada para validar el
-          flujo completo. El siguiente paso será conectarla con el panel del
-          profesional para que pueda aceptarla.
+          Puedes seguir el estado en tiempo real sin crear una cuenta. Guarda
+          el enlace: funciona como acceso privado a esta solicitud.
         </p>
 
         <div className="mt-6 grid gap-2 sm:grid-cols-2">
+          <Link
+            href={`/seguimiento/${createdRequest.trackingToken}`}
+            className="flex min-h-12 items-center justify-center rounded-2xl bg-[#182019] text-sm font-black text-white"
+          >
+            Seguir solicitud
+          </Link>
           <Link
             href={`/cerrajero/${locksmith.slug}`}
             className="flex min-h-12 items-center justify-center rounded-2xl border border-[#dfe3df] text-sm font-black"
           >
             Volver al perfil
-          </Link>
-          <Link
-            href="/"
-            className="flex min-h-12 items-center justify-center rounded-2xl bg-[#182019] text-sm font-black text-white"
-          >
-            Ir al inicio
           </Link>
         </div>
       </section>
